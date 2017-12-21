@@ -31,6 +31,7 @@ class FaceLock(object):
         self.AK = conf.get('setting', 'API_KEY')
         self.SK = conf.get('setting', 'SECRET_KEY')
         self.SCREEN_LOCK_LEVEL = float(conf.get('setting', 'SCREEN_LOCK_LEVEL'))
+        self.LOCK_FACE_LIVENESS = float(conf.get('setting', 'LOCK_FACE_LIVENESS'))
         self.RETRY_TIME = int(conf.get('setting', 'RETRY_TIME'))
         if not os.path.exists('./log'):
             os.mkdir('./log')
@@ -59,17 +60,18 @@ class FaceLock(object):
 
     # 开始检测
     def __checkIsMe(self):
-        time.sleep(10)
+        # time.sleep(10)
         res = self.__match()
         logging.info('人脸识别结果：%s' % res)
         if res.get('result_num', 0) > 0:
-            score = res['result'][0]['score']
-            if score < self.SCREEN_LOCK_LEVEL:
-                logging.info('人脸相似度：%d ，小于%d，即将锁屏！' % (score, self.SCREEN_LOCK_LEVEL))
+            faceliveness = res.get('ext_info').get('faceliveness').split(',')[0]
+            score = res['result'][0].get('score')
+            if float(faceliveness) < self.LOCK_FACE_LIVENESS or float(score) < self.SCREEN_LOCK_LEVEL:
+                logging.info('人脸相似度过小，或者不是真人识别，即将锁屏！')
                 # 锁屏
                 self.__lockScreen()
             else:
-                logging.info('人脸相似度：%s，不锁屏' % score)
+                logging.info('人脸相似度：%s，活体概率：%s，不锁屏' % (score, faceliveness))
         else:
             logging.error('人脸识别失败，可能没人在电脑面前，立即锁屏')
             self.__lockScreen(True)
@@ -104,7 +106,9 @@ class FaceLock(object):
         img1 = base64.b64encode(open('./picture/face.jpg', 'rb').read()).decode()
         img2 = base64.b64encode(open('./picture/myFace.jpg', 'rb').read()).decode()
         data = {
-            'images': img1 + ',' + img2
+            'images': img1 + ',' + img2,
+            'image_liveness': 'faceliveness,',
+            'types': '7,7'
         }
         try:
             request = requests.post(url, data=data)
