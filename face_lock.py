@@ -78,11 +78,15 @@ class FaceLock(object):
 
     # 锁屏
     def __lockScreen(self, now=False):
+        # 当前日期
+        nowDate = datetime.datetime.now().strftime("%Y_%m_%d")
+        # 当前时间
+        nowTime = datetime.datetime.now().strftime("%H_%M_%S")
         # 保存导致锁屏的图片
-        lock_picture_path = './picture/lock_pictures'
+        lock_picture_path = './picture/lock_pictures/%s' % nowDate
         if not os.path.exists(lock_picture_path):
             os.makedirs(lock_picture_path)
-        new_path = '%s/%s.jpg' % (lock_picture_path, datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
+        new_path = '%s/%s.jpg' % (lock_picture_path, nowTime)
         shutil.move('./picture/face.jpg', new_path)
         res = 'NOW'
         if not now:
