@@ -50,6 +50,8 @@ class FaceLock(object):
         if self.PLATFORM not in ['Darwin', 'Windows']:
             self.logger.error('暂不支持您的系统：%s，程序退出' % self.PLATFORM)
             exit()
+        # Access Token的有效期为30天（以秒为单位）
+        self.ACCESS_TOKEN = self.__getAccessToken()
 
     # 获取接口access token
     def __getAccessToken(self):
@@ -121,9 +123,9 @@ class FaceLock(object):
 
     # 人脸识别匹配
     def __match(self):
-        AT = self.__getAccessToken()
+
         self.__getFace()
-        url = 'https://aip.baidubce.com/rest/2.0/face/v2/match?access_token=%s' % AT
+        url = 'https://aip.baidubce.com/rest/2.0/face/v2/match?access_token=%s' % self.ACCESS_TOKEN
         img1 = base64.b64encode(open('./picture/face.jpg', 'rb').read()).decode()
         img2 = base64.b64encode(open('./picture/myFace.jpg', 'rb').read()).decode()
         data = {
