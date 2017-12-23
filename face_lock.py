@@ -5,18 +5,20 @@
    date：          2017/12/20
 -------------------------------------------------
 """
-import requests
 import os
 import json
 import base64
 import cv2
 import time
 import datetime
-from PIL import Image
 import logging
-import pyautogui as pag
 import configparser
 import shutil
+import requests
+import ctypes
+import platform
+import pyautogui as pag
+from PIL import Image
 
 
 class FaceLock(object):
@@ -25,9 +27,10 @@ class FaceLock(object):
     POINT_X = POINT_Y = GET_AT_TIME = FACE_MATCH_TIME = 0
 
     def __init__(self):
+        self.PLATFORM = platform.system()
         # 读取配置文件
         conf = configparser.ConfigParser()
-        conf.read('./conf.ini')
+        conf.read('./conf.ini', encoding='utf-8')
         self.AK = conf.get('setting', 'API_KEY')
         self.SK = conf.get('setting', 'SECRET_KEY')
         self.SCREEN_LOCK_LEVEL = float(conf.get('setting', 'SCREEN_LOCK_LEVEL'))
@@ -36,8 +39,12 @@ class FaceLock(object):
         if not os.path.exists('./log'):
             os.mkdir('./log')
         logName = './log/%s.log' % datetime.datetime.now().strftime('%Y_%m_%d')
-        logging.basicConfig(filename=logName, level=logging.INFO,
-                            format='[%(asctime)s] - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s')
+        self.logger = logging.getLogger('face_lock__logger')
+        fh = logging.FileHandler(logName, encoding='utf-8')
+        self.logger.setLevel(logging.INFO)
+        formatter = logging.Formatter('[%(asctime)s] - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s')
+        fh.setFormatter(formatter)
+        self.logger.addHandler(fh)
 
     # 获取接口access token
     def __getAccessToken(self):
@@ -49,31 +56,31 @@ class FaceLock(object):
             res = json.loads(request.text)
             return res['access_token']
         except Exception as e:
-            logging.error('获取access token失败:%s' % e)
+            self.logger.error('获取access token失败:%s' % e)
             if self.GET_AT_TIME < self.RETRY_TIME:
                 self.GET_AT_TIME += 1
                 self.__getAccessToken()
             else:
-                logging.error('获取access token失败,重试次数已用尽，程序退出')
+                self.logger.error('获取access token失败,重试次数已用尽，程序退出')
                 pag.alert(text='获取access token失败,重试次数已用尽，程序退出', title='人脸识别锁屏', timeout=1000 * 5)
                 exit()
 
     # 开始检测
     def __checkIsMe(self):
-        time.sleep(10)
+        # time.sleep(10)
         res = self.__match()
-        logging.info('人脸识别结果：%s' % res)
+        self.logger.info('人脸识别结果：%s' % res)
         if res.get('result_num', 0) > 0:
             faceliveness = res.get('ext_info').get('faceliveness').split(',')[0]
             score = res['result'][0].get('score')
             if float(faceliveness) < self.LOCK_FACE_LIVENESS or float(score) < self.SCREEN_LOCK_LEVEL:
-                logging.info('人脸相似度过小，或者不是真人识别，即将锁屏！')
+                self.logger.info('人脸识别相似度太小，或者不是真人，即将锁屏！')
                 # 锁屏
                 self.__lockScreen()
             else:
-                logging.info('人脸相似度：%s，活体概率：%s，不锁屏' % (score, faceliveness))
+                self.logger.info('人脸相似度：%s，真人概率：%s，不锁屏' % (score, faceliveness))
         else:
-            logging.error('人脸识别失败，可能没人在电脑面前，立即锁屏')
+            self.logger.error('人脸识别失败，可能没人在电脑面前，即将锁屏！')
             self.__lockScreen(True)
 
     # 锁屏
@@ -91,14 +98,20 @@ class FaceLock(object):
         res = 'NOW'
         if not now:
             res = pag.confirm('倒计时4秒，确定要锁屏吗?', timeout=1000 * 4, title='人脸识别锁屏')
-            logging.info('confirm : %s' % res)
+            self.logger.info('confirm : %s' % res)
 
         if res == 'OK' or res == 'Timeout' or res == 'NOW':
             self.LOCK_SCREEN = True
-            os.system('/System/Library/CoreServices/Menu\ Extras/User.menu/Contents/Resources/CGSession -suspend')
+            if self.PLATFORM == 'Darwin':
+                # macOS
+                os.system('/System/Library/CoreServices/Menu\ Extras/User.menu/Contents/Resources/CGSession -suspend')
+            elif self.PLATFORM == 'Windows':
+                # windows
+                dll = ctypes.WinDLL('user32.dll')
+                dll.LockWorkStation()
             time.sleep(7)
             x, y = pag.position()
-            logging.info('锁屏前坐标：x=%d，y=%d' % (x, y))
+            self.logger.info('锁屏前鼠标坐标：x=%d，y=%d' % (x, y))
             self.POINT_X = x
             self.POINT_Y = y
 
@@ -125,12 +138,12 @@ class FaceLock(object):
             else:
                 return res
         except Exception as e:
-            logging.error('人脸识别错误: %s' % e)
+            self.logger.error('人脸识别错误: %s' % e)
             if self.FACE_MATCH_TIME < self.RETRY_TIME:
                 self.FACE_MATCH_TIME += 1
                 self.__match()
             else:
-                logging.error('人脸识别失败,重试次数已用尽，程序退出')
+                self.logger.error('人脸识别失败，重试次数已用尽，程序退出')
                 pag.alert('人脸识别失败,重试次数已用尽，程序退出', title='人脸识别锁屏', timeout=1000 * 5)
                 exit()
 
@@ -149,7 +162,7 @@ class FaceLock(object):
                 image.save("./picture/face.jpg", format='jpeg')
                 break
             else:
-                logging.error('拍照失败，重试...')
+                self.logger.error('排在失败，重试...')
         cap.release()
 
     # 检查鼠标是否移动
@@ -157,13 +170,13 @@ class FaceLock(object):
         # 每隔10秒检查一次
         time.sleep(10)
         x, y = pag.position()
-        logging.info('鼠标坐标：x=%d,y=%d' % (x, y))
+        self.logger.info('鼠标坐标：x=%d,y=%d' % (x, y))
         if x == self.POINT_X and y == self.POINT_Y:
-            logging.info('鼠标没动，还是锁屏状态')
+            self.logger.info('鼠标没动，还是锁屏状态')
         else:
             # 鼠标移动了，说明锁屏，继续运行
             self.LOCK_SCREEN = False
-            logging.info('鼠标动了，继续运行人脸检测')
+            self.logger.info('鼠标动了，继续开始识别')
 
     # 开始执行
     def execute(self):
