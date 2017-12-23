@@ -24,7 +24,7 @@ from PIL import Image
 class FaceLock(object):
     """ 人脸识别锁屏类 """
     LOCK_SCREEN = False
-    POINT_X = POINT_Y = GET_AT_TIME = FACE_MATCH_TIME = 0
+    POINT_X = POINT_Y = GET_AT_TIME = GET_FACE_TIME = FACE_MATCH_TIME = 0
     ALERT_TIMEOUT = 1000 * 4
     ALERT_TITLE = '人脸识别锁屏'
 
@@ -74,8 +74,9 @@ class FaceLock(object):
 
     # 开始检测
     def __checkIsMe(self):
-        time.sleep(10)
-        res = self.__match()
+        # time.sleep(10)
+        self.__getFace()
+        res = self.__matchFace()
         self.logger.info('人脸识别结果：%s' % res)
         if res.get('result_num', 0) > 0:
             faceliveness = res.get('ext_info').get('faceliveness').split(',')[0]
@@ -122,9 +123,7 @@ class FaceLock(object):
             self.POINT_Y = y
 
     # 人脸识别匹配
-    def __match(self):
-
-        self.__getFace()
+    def __matchFace(self):
         url = 'https://aip.baidubce.com/rest/2.0/face/v2/match?access_token=%s' % self.ACCESS_TOKEN
         img1 = base64.b64encode(open('./picture/face.jpg', 'rb').read()).decode()
         img2 = base64.b64encode(open('./picture/myFace.jpg', 'rb').read()).decode()
@@ -147,7 +146,7 @@ class FaceLock(object):
             self.logger.error('人脸识别错误: %s' % e)
             if self.FACE_MATCH_TIME < self.RETRY_TIME:
                 self.FACE_MATCH_TIME += 1
-                self.__match()
+                self.__matchFace()
             else:
                 self.logger.error('人脸识别失败，重试次数已用尽，程序退出')
                 pag.alert('人脸识别失败，重试次数已用尽，程序退出', title=self.ALERT_TITLE, timeout=self.ALERT_TIMEOUT)
@@ -170,6 +169,12 @@ class FaceLock(object):
                 break
             else:
                 self.logger.error('拍照失败，重试...')
+                if self.GET_FACE_TIME < self.RETRY_TIME:
+                    self.GET_FACE_TIME += 1
+                else:
+                    self.logger.error('拍照失败，重试次数已用尽，程序退出')
+                    pag.alert('拍照失败，重试次数已用尽，程序退出', title=self.ALERT_TITLE, timeout=self.ALERT_TIMEOUT)
+                    exit()
         cap.release()
 
     # 检查鼠标是否移动
