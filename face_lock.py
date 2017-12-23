@@ -29,7 +29,6 @@ class FaceLock(object):
     ALERT_TITLE = '人脸识别锁屏'
 
     def __init__(self):
-        self.PLATFORM = platform.system()
         # 读取配置文件
         conf = configparser.ConfigParser()
         conf.read('./conf.ini', encoding='utf-8')
@@ -47,6 +46,10 @@ class FaceLock(object):
         formatter = logging.Formatter('[%(asctime)s] - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s')
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
+        self.PLATFORM = platform.system()
+        if self.PLATFORM not in ['Darwin', 'Windows']:
+            self.logger.error('暂不支持您的系统：%s，程序退出' % self.PLATFORM)
+            exit()
 
     # 获取接口access token
     def __getAccessToken(self):
@@ -77,7 +80,6 @@ class FaceLock(object):
             score = res['result'][0].get('score')
             if float(faceliveness) < self.LOCK_FACE_LIVENESS or float(score) < self.SCREEN_LOCK_LEVEL:
                 self.logger.info('人脸识别相似度太小，或者不是真人，即将锁屏')
-                # 锁屏
                 self.__lockScreen()
             else:
                 self.logger.info('人脸相似度：%s，真人概率：%s，不锁屏' % (score, faceliveness))
@@ -162,6 +164,7 @@ class FaceLock(object):
                 if not os.path.exists('./picture'):
                     os.mkdir('./picture')
                 image.save("./picture/face.jpg", format='jpeg')
+                del frame, ret, image
                 break
             else:
                 self.logger.error('拍照失败，重试...')
@@ -187,6 +190,9 @@ class FaceLock(object):
                 self.__checkPointMove()
             else:
                 self.__checkIsMe()
+
+    def __del__(self):
+        print('已关闭')
 
 
 if __name__ == '__main__':
