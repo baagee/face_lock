@@ -25,6 +25,8 @@ class FaceLock(object):
     """ 人脸识别锁屏类 """
     LOCK_SCREEN = False
     POINT_X = POINT_Y = GET_AT_TIME = FACE_MATCH_TIME = 0
+    ALERT_TIMEOUT = 1000 * 4
+    ALERT_TITLE = '人脸识别锁屏'
 
     def __init__(self):
         self.PLATFORM = platform.system()
@@ -39,7 +41,7 @@ class FaceLock(object):
         if not os.path.exists('./log'):
             os.mkdir('./log')
         logName = './log/%s.log' % datetime.datetime.now().strftime('%Y_%m_%d')
-        self.logger = logging.getLogger('face_lock__logger')
+        self.logger = logging.getLogger('face_lock_logger')
         fh = logging.FileHandler(logName, encoding='utf-8')
         self.logger.setLevel(logging.INFO)
         formatter = logging.Formatter('[%(asctime)s] - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s')
@@ -61,8 +63,8 @@ class FaceLock(object):
                 self.GET_AT_TIME += 1
                 self.__getAccessToken()
             else:
-                self.logger.error('获取access token失败,重试次数已用尽，程序退出')
-                pag.alert(text='获取access token失败,重试次数已用尽，程序退出', title='人脸识别锁屏', timeout=1000 * 5)
+                self.logger.error('获取access token失败，重试次数已用尽，程序退出')
+                pag.alert(text='获取access token失败，重试次数已用尽，程序退出', title=self.ALERT_TITLE, timeout=self.ALERT_TIMEOUT)
                 exit()
 
     # 开始检测
@@ -74,13 +76,13 @@ class FaceLock(object):
             faceliveness = res.get('ext_info').get('faceliveness').split(',')[0]
             score = res['result'][0].get('score')
             if float(faceliveness) < self.LOCK_FACE_LIVENESS or float(score) < self.SCREEN_LOCK_LEVEL:
-                self.logger.info('人脸识别相似度太小，或者不是真人，即将锁屏！')
+                self.logger.info('人脸识别相似度太小，或者不是真人，即将锁屏')
                 # 锁屏
                 self.__lockScreen()
             else:
                 self.logger.info('人脸相似度：%s，真人概率：%s，不锁屏' % (score, faceliveness))
         else:
-            self.logger.error('人脸识别失败，可能没人在电脑面前，即将锁屏！')
+            self.logger.error('人脸识别失败，可能没人在电脑面前，立即锁屏')
             self.__lockScreen(True)
 
     # 锁屏
@@ -97,8 +99,8 @@ class FaceLock(object):
         shutil.move('./picture/face.jpg', new_path)
         res = 'NOW'
         if not now:
-            res = pag.confirm('倒计时4秒，确定要锁屏吗?', timeout=1000 * 4, title='人脸识别锁屏')
-            self.logger.info('confirm : %s' % res)
+            res = pag.confirm('倒计时4秒，确定要锁屏吗?', title=self.ALERT_TITLE, timeout=self.ALERT_TIMEOUT)
+            self.logger.info('confirm 弹框返回值: %s' % res)
 
         if res == 'OK' or res == 'Timeout' or res == 'NOW':
             self.LOCK_SCREEN = True
@@ -144,7 +146,7 @@ class FaceLock(object):
                 self.__match()
             else:
                 self.logger.error('人脸识别失败，重试次数已用尽，程序退出')
-                pag.alert('人脸识别失败,重试次数已用尽，程序退出', title='人脸识别锁屏', timeout=1000 * 5)
+                pag.alert('人脸识别失败，重试次数已用尽，程序退出', title=self.ALERT_TITLE, timeout=self.ALERT_TIMEOUT)
                 exit()
 
     # 拍照
@@ -162,7 +164,7 @@ class FaceLock(object):
                 image.save("./picture/face.jpg", format='jpeg')
                 break
             else:
-                self.logger.error('排在失败，重试...')
+                self.logger.error('拍照失败，重试...')
         cap.release()
 
     # 检查鼠标是否移动
