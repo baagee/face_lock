@@ -74,7 +74,7 @@ class FaceLock(object):
 
     # 开始检测
     def __checkIsMe(self):
-        # time.sleep(10)
+        time.sleep(10)
         self.__getFace()
         res = self.__matchFace()
         self.logger.info('人脸识别结果：%s' % res)
