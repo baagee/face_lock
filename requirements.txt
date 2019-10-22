@@ -9,7 +9,7 @@ modulegraph==0.16
 numpy==1.13.3
 olefile==0.44
 opencv-python==3.3.0.10
-Pillow==4.3.0
+Pillow==6.2.0
 py2app==0.14
 PyAutoGUI==0.9.36
 pygame==1.9.3
